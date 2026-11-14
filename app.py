@@ -445,8 +445,9 @@ elif page == "Model Performance":
                 elif mname == "SARIMA":
                     preds = m_obj.predict_in_sample(len(test_series))
                 else:  # LSTM
+                    lstm_train = getattr(engine, "_lstm_train_trimmed", st.session_state.train_df["consumption"])
                     preds = m_obj.predict_in_sample(
-                        st.session_state.train_df["consumption"], len(test_series)
+                        lstm_train, len(test_series)
                     )
                 st.plotly_chart(
                     actual_vs_predicted(test_series, preds, mname),

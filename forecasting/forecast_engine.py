@@ -117,11 +117,17 @@ class ForecastEngine:
         if progress_cb:
             progress_cb("Training LSTM (this may take a minute)…")
 
-        m = LSTMModel(lookback=lookback, epochs=epochs)
-        m.fit(train_s)
+        # Use last 500 points for training to keep pure-NumPy LSTM fast
+        train_trimmed = train_s.iloc[-500:] if len(train_s) > 500 else train_s
+        # Reduce lookback if trimmed set is small
+        lb = min(lookback, len(train_trimmed) // 4)
+
+        m = LSTMModel(lookback=lb, units=16, epochs=epochs)
+        m.fit(train_trimmed)
+        self._lstm_train_trimmed = train_trimmed
         self._models["LSTM"] = m
 
-        test_preds = m.predict_in_sample(train_s, len(test_s))
+        test_preds = m.predict_in_sample(train_trimmed, len(test_s))
         metrics = evaluate_all(test_s.values, test_preds)
         self._results["LSTM"] = metrics
 
