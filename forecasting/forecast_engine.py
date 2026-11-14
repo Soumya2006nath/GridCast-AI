@@ -117,12 +117,19 @@ class ForecastEngine:
         if progress_cb:
             progress_cb("Training LSTM (this may take a minute)…")
 
-        # Use last 500 points for training to keep pure-NumPy LSTM fast
-        train_trimmed = train_s.iloc[-500:] if len(train_s) > 500 else train_s
-        # Reduce lookback if trimmed set is small
-        lb = min(lookback, len(train_trimmed) // 4)
+        from models.lstm_model import _try_keras
+        if _try_keras():
+            # Full Keras LSTM — use all training data
+            train_trimmed = train_s
+            lb = lookback
+            u = 64
+        else:
+            # NumPy ridge fallback — trim to keep it fast
+            train_trimmed = train_s.iloc[-500:] if len(train_s) > 500 else train_s
+            lb = min(lookback, max(4, len(train_trimmed) // 4))
+            u = 16
 
-        m = LSTMModel(lookback=lb, units=16, epochs=epochs)
+        m = LSTMModel(lookback=lb, units=u, epochs=epochs)
         m.fit(train_trimmed)
         self._lstm_train_trimmed = train_trimmed
         self._models["LSTM"] = m
