@@ -1,117 +1,113 @@
-# ⚡ GridCast AI — Smart Grid Electricity Consumption Forecasting
+# ⚡ GridCast AI v2 — Smart Grid Electricity Forecasting
 
 **Group 14** | AI/ML — Time Series Forecasting  
 Team: Lawrence Sarkar, Soumyadeep Nath, Sayon De, Pravin Agarwal
 
 ---
 
-## What It Does
+## Architecture
 
-GridCast AI analyzes historical smart-meter data and predicts electricity consumption for the next **7 days** using three models:
-
-| Model | Type |
-|---|---|
-| ARIMA | Statistical — AutoRegressive Integrated Moving Average |
-| SARIMA | Statistical — Seasonal ARIMA |
-| LSTM | Deep Learning — Long Short-Term Memory |
+```
+Browser (Next.js + Tailwind + Recharts)
+        ↕  REST API (JSON)
+FastAPI backend  →  ARIMA / SARIMA / LSTM (GPU via TensorFlow + CUDA)
+```
 
 ---
 
-## Setup
+## GPU Setup (RTX 4050)
 
-### 1. Install Python 3.11+
-
-Download from [python.org](https://www.python.org/downloads/).
-
-### 2. Create a virtual environment (recommended)
+Install CUDA 12.x from [developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads), then:
 
 ```bash
-python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # macOS / Linux
+pip install tensorflow[and-cuda]
 ```
 
-### 3. Install dependencies
+TensorFlow will automatically detect and use the GPU. The backend logs `[LSTM] Training on GPU: ...` on startup.
+
+---
+
+## Quick Start
+
+### 1. Backend
 
 ```bash
+cd backend
 pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
-> LSTM training requires TensorFlow. On Windows you may need:
-> `pip install tensorflow-cpu` if GPU drivers are unavailable.
+Or double-click `start-backend.bat`.
 
-### 4. Run the app
+Backend runs at [http://localhost:8000](http://localhost:8000)  
+API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### 2. Frontend
 
 ```bash
-streamlit run app.py
+cd frontend
+npm install
+npm run dev
 ```
 
-The dashboard opens at `http://localhost:8501`.
+Or double-click `start-frontend.bat`.
+
+Frontend runs at [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## Usage
+## API Endpoints
 
-1. Click **Use Sample Dataset** (sidebar) or upload your own CSV.
-2. Required columns: `timestamp`, `consumption`
-3. Navigate to **Forecasting**, select a model, and click **Generate Forecast**.
-4. View metrics on **Model Performance**.
-5. Download a PDF report from **Reports**.
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/dataset/sample` | Load built-in sample dataset |
+| POST | `/api/dataset/upload` | Upload a CSV file |
+| GET | `/api/dataset/stats` | Dataset statistics |
+| GET | `/api/dataset/historical` | Full time series |
+| GET | `/api/dataset/daily` | Daily aggregates |
+| POST | `/api/forecast/run` | Train model + generate forecast |
+| GET | `/api/metrics` | Model evaluation results |
+| GET | `/api/report/pdf` | Download PDF report |
+| GET | `/api/health` | Server + GPU status |
 
-### CSV Format
+---
+
+## CSV Format
 
 ```csv
 timestamp,consumption,temperature,humidity
-2022-01-01 00:00:00,3.52,12.3,65.1
-2022-01-01 01:00:00,3.11,11.9,66.2
-...
+2024-01-01 00:00:00,3.52,12.3,65.1
 ```
 
-Minimum 48 rows. Timestamps must be parseable by `pandas.to_datetime`.
+Minimum 48 rows. `timestamp` and `consumption` are required.
 
 ---
 
 ## Project Structure
 
 ```
-gridcast-ai/
-├── app.py                    # Streamlit dashboard entry point
-├── requirements.txt
-├── README.md
-├── data/
-│   └── sample_energy_data.csv
-├── models/
-│   ├── arima_model.py
-│   ├── sarima_model.py
-│   └── lstm_model.py
-├── preprocessing/
-│   └── data_processor.py
-├── forecasting/
-│   └── forecast_engine.py
-├── evaluation/
-│   └── metrics.py
-├── visualization/
-│   └── charts.py
-├── reporting/
-│   └── report_generator.py
-└── utils/
-    └── validation.py
+GridCast AI/
+├── backend/
+│   ├── main.py              ← FastAPI app
+│   ├── models/              ← ARIMA, SARIMA, LSTM (GPU)
+│   ├── preprocessing/
+│   ├── forecasting/
+│   ├── evaluation/
+│   ├── reporting/
+│   ├── utils/
+│   ├── data/
+│   └── requirements.txt
+├── frontend/
+│   ├── app/                 ← Next.js pages
+│   ├── components/          ← Sidebar, KPI cards, charts, pages
+│   └── lib/api.ts           ← API client
+├── start-backend.bat
+├── start-frontend.bat
+└── README.md
 ```
 
 ---
 
-## Evaluation Metrics
+## Legacy Streamlit App
 
-- **MAE** — Mean Absolute Error (primary metric)
-- **RMSE** — Root Mean Squared Error
-- **MAPE** — Mean Absolute Percentage Error
-
-All metrics are calculated on a held-out chronological test set (last 30 days). No future data leaks into training.
-
----
-
-## Notes
-
-- The app runs entirely locally — no paid APIs required.
-- LSTM training takes 1–3 minutes depending on dataset size and hardware.
-- Uploaded datasets are only held in session memory and not persisted to disk.
+The original Streamlit app is still in the root (`app.py`) and works independently.
