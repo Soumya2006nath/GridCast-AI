@@ -2,6 +2,7 @@
 import { useState } from "react";
 import DailyChart from "../charts/DailyChart";
 import HistoricalChart from "../charts/HistoricalChart";
+import ClientOnly from "../ClientOnly";
 
 interface Props {
   daily: { timestamp: string; consumption: number }[];
@@ -51,12 +52,12 @@ export default function Analysis({ daily, weekly, monthly, historical, preview }
             </table>
           </div>
         )}
-        {tab === "Daily" && <><p className="text-sm font-semibold mb-3" style={{ color: "var(--blue)" }}>Daily Consumption</p><DailyChart data={daily} /></>}
-        {tab === "Weekly" && <><p className="text-sm font-semibold mb-3" style={{ color: "var(--green)" }}>Weekly Trend</p><DailyChart data={weekly} /></>}
+        {tab === "Daily" && <><p className="text-sm font-semibold mb-3" style={{ color: "var(--blue)" }}>Daily Consumption</p><ClientOnly><DailyChart data={daily} /></ClientOnly></>}
+        {tab === "Weekly" && <><p className="text-sm font-semibold mb-3" style={{ color: "var(--green)" }}>Weekly Trend</p><ClientOnly><DailyChart data={weekly} /></ClientOnly></>}
         {tab === "Monthly" && monthly.length >= 2
-          ? <><p className="text-sm font-semibold mb-3" style={{ color: "#9c27b0" }}>Monthly Trend</p><DailyChart data={monthly} /></>
+          ? <><p className="text-sm font-semibold mb-3" style={{ color: "#9c27b0" }}>Monthly Trend</p><ClientOnly><DailyChart data={monthly} /></ClientOnly></>
           : tab === "Monthly" && <p style={{ color: "var(--muted)" }}>Need at least 2 months of data.</p>}
-        {tab === "Full History" && <><p className="text-sm font-semibold mb-3" style={{ color: "var(--cyan)" }}>Historical Consumption</p><HistoricalChart data={historical} /></>}
+        {tab === "Full History" && <><p className="text-sm font-semibold mb-3" style={{ color: "var(--cyan)" }}>Historical Consumption</p><ClientOnly><HistoricalChart data={historical} /></ClientOnly></>}
       </div>
     </div>
   );

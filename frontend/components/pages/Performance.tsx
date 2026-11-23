@@ -1,5 +1,6 @@
 "use client";
 import MetricsChart from "../charts/MetricsChart";
+import ClientOnly from "../ClientOnly";
 
 interface ModelMetrics { MAE: number; RMSE: number; MAPE: number | null }
 interface Props {
@@ -48,7 +49,7 @@ export default function Performance({ metrics, bestModel }: Props) {
       {/* Bar chart */}
       <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <p className="text-sm font-semibold mb-3" style={{ color: "var(--cyan)" }}>Visual Comparison</p>
-        <MetricsChart metrics={metrics} />
+        <ClientOnly><MetricsChart metrics={metrics} /></ClientOnly>
       </div>
     </div>
   );

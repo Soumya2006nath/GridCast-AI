@@ -3,6 +3,7 @@ import { useState } from "react";
 import KpiCard from "../KpiCard";
 import ForecastChart from "../charts/ForecastChart";
 import { runForecast } from "../../lib/api";
+import ClientOnly from "../ClientOnly";
 
 interface ForecastRow { Date: string; Predicted_kWh: number }
 interface Summary { avg_daily_kwh: number; peak_daily_kwh: number; total_7d_kwh: number }
@@ -81,7 +82,7 @@ export default function Forecasting({ historicalAvg, onMetricsUpdate }: Props) {
 
           {forecast && (
             <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-              <ForecastChart data={forecast} historicalAvg={historicalAvg} model={model} />
+              <ClientOnly><ForecastChart data={forecast} historicalAvg={historicalAvg} model={model} /></ClientOnly>
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>

@@ -1,6 +1,7 @@
 "use client";
 import KpiCard from "../KpiCard";
 import HistoricalChart from "../charts/HistoricalChart";
+import ClientOnly from "../ClientOnly";
 
 interface Stats {
   total_kwh: number; mean_kwh: number; max_kwh: number; min_kwh: number;
@@ -39,7 +40,9 @@ export default function Overview({ stats, historical, metrics, bestModel }: Prop
 
       <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <p className="text-sm font-semibold mb-3" style={{ color: "var(--cyan)" }}>Historical Consumption</p>
-        {historical.length > 0 ? <HistoricalChart data={historical} /> : <p style={{ color: "var(--muted)" }}>Loading chart…</p>}
+        {historical.length > 0
+          ? <ClientOnly><HistoricalChart data={historical} /></ClientOnly>
+          : <p style={{ color: "var(--muted)" }}>Loading chart…</p>}
       </div>
 
       {metrics && (
