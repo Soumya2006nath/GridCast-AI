@@ -1,7 +1,9 @@
 """
 backend/forecasting/forecast_engine.py
 Orchestrates model training, evaluation, and 7-day forecasting.
+Supports saving/loading pre-trained models for instant demo.
 """
+import os
 import numpy as np
 import pandas as pd
 from typing import Optional, Dict, Any
@@ -9,6 +11,7 @@ from typing import Optional, Dict, Any
 from evaluation.metrics import evaluate_all, best_model
 
 FORECAST_DAYS = 7
+MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "saved_models")
 
 
 class ForecastEngine:
@@ -21,6 +24,7 @@ class ForecastEngine:
         self._train: Optional[pd.DataFrame] = None
         self._test: Optional[pd.DataFrame] = None
         self._lstm_train_trimmed = None
+        os.makedirs(MODEL_DIR, exist_ok=True)
 
     def set_data(self, train: pd.DataFrame, test: pd.DataFrame) -> None:
         self._train = train
@@ -33,7 +37,7 @@ class ForecastEngine:
             freq=self.resample_freq,
         )
 
-    def run_arima(self) -> dict:
+    def run_arima(self, use_cached: bool = True) -> dict:
         from models.arima_model import ARIMAModel
         train_s = self._train["consumption"]
         test_s = self._test["consumption"]
@@ -46,7 +50,7 @@ class ForecastEngine:
         self._forecasts["ARIMA"] = np.maximum(0, m.predict(steps))
         return metrics
 
-    def run_sarima(self) -> dict:
+    def run_sarima(self, use_cached: bool = True) -> dict:
         from models.sarima_model import SARIMAModel
         train_s = self._train["consumption"]
         test_s = self._test["consumption"]
@@ -59,13 +63,37 @@ class ForecastEngine:
         self._forecasts["SARIMA"] = np.maximum(0, m.predict(steps))
         return metrics
 
-    def run_lstm(self, lookback: int = 48, epochs: int = 30) -> dict:
+    def run_lstm(self, lookback: int = 48, epochs: int = 30, use_cached: bool = True) -> dict:
+        """
+        Train LSTM or load pre-trained model.
+        
+        For demos: set use_cached=True and pre-train once with:
+        >>> engine.run_lstm(epochs=50, use_cached=False)
+        >>> # saves to backend/saved_models/lstm_demo.keras
+        
+        Then during demo, use_cached=True loads instantly.
+        """
         from models.lstm_model import LSTMModel
         train_s = self._train["consumption"]
         test_s = self._test["consumption"]
         steps = _steps_for_days(FORECAST_DAYS, self.resample_freq)
-        m = LSTMModel(lookback=lookback, units=128, epochs=epochs, batch_size=64)
-        m.fit(train_s)
+        
+        model_path = os.path.join(MODEL_DIR, "lstm_demo.keras")
+        
+        if use_cached and os.path.exists(model_path):
+            # Load pre-trained model (instant)
+            print(f"[DEMO MODE] Loading pre-trained LSTM from {model_path}")
+            m = LSTMModel(lookback=lookback, units=128, epochs=epochs, batch_size=64)
+            m.load(model_path, train_series=train_s)
+        else:
+            # Train from scratch
+            print(f"[TRAINING] Training LSTM on {'GPU' if _has_gpu() else 'CPU'}...")
+            m = LSTMModel(lookback=lookback, units=128, epochs=epochs, batch_size=64)
+            m.fit(train_s)
+            # Save for future demos
+            m.save(model_path)
+            print(f"[SAVED] Model saved to {model_path} for future demos")
+        
         self._lstm_train_trimmed = train_s
         self._models["LSTM"] = m
         metrics = evaluate_all(test_s.values, m.predict_in_sample(train_s, len(test_s)))
@@ -107,3 +135,10 @@ def _steps_for_days(days, freq):
 
 def _seasonal_period(freq):
     return {"h": 24, "D": 7, "30min": 48, "15min": 96}.get(freq, 24)
+
+def _has_gpu():
+    try:
+        import tensorflow as tf
+        return len(tf.config.list_physical_devices("GPU")) > 0
+    except:
+        return False
