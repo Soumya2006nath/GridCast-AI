@@ -92,12 +92,41 @@ class LSTMModel:
         return self._inverse_scale(np.array(out))
 
     def save(self, path: str) -> None:
+        """Save model weights and scaler params."""
         if self._model:
+            import json
             self._model.save(path)
+            meta = {
+                "scaler_min": self.scaler_min,
+                "scaler_max": self.scaler_max,
+                "lookback": self.lookback,
+            }
+            meta_path = path.replace(".keras", "_meta.json")
+            with open(meta_path, "w") as f:
+                json.dump(meta, f)
 
-    def load(self, path: str) -> None:
+    def load(self, path: str, train_series=None) -> None:
+        """Load model and restore scaler. Pass train_series to recompute last window."""
         import tensorflow as tf
+        import json
+        # Restore mixed precision policy so loaded model works correctly
+        try:
+            tf.keras.mixed_precision.set_global_policy("mixed_float16")
+        except Exception:
+            pass
         self._model = tf.keras.models.load_model(path)
+        # Load scaler metadata
+        meta_path = path.replace(".keras", "_meta.json")
+        if os.path.exists(meta_path):
+            with open(meta_path) as f:
+                meta = json.load(f)
+            self.scaler_min = float(meta["scaler_min"])
+            self.scaler_max = float(meta["scaler_max"])
+            self.lookback = int(meta["lookback"])
+        # Rebuild last window from training series so predict() works
+        if train_series is not None:
+            scaled = self._scale(train_series.values.astype(float))
+            self._last_window = scaled[-self.lookback:].copy()
         self.fitted = True
 
     # ------------------------------------------------------------------
@@ -105,10 +134,11 @@ class LSTMModel:
     def _build(lookback: int, units: int):
         import tensorflow as tf
         from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
+        from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization, Input
 
         m = Sequential([
-            LSTM(units, return_sequences=True, input_shape=(lookback, 1)),
+            Input(shape=(lookback, 1)),
+            LSTM(units, return_sequences=True),
             BatchNormalization(),
             Dropout(0.2),
             LSTM(units // 2, return_sequences=True),

@@ -142,6 +142,7 @@ class ForecastRequest(BaseModel):
     model: str          # "ARIMA" | "SARIMA" | "LSTM"
     lookback: int = 48
     epochs: int = 30
+    use_cached: bool = True  # True = load saved LSTM (instant); False = retrain
 
 
 @app.post("/api/forecast/run")
@@ -156,7 +157,7 @@ def run_forecast(req: ForecastRequest):
         elif model == "SARIMA":
             metrics = engine.run_sarima()
         elif model == "LSTM":
-            metrics = engine.run_lstm(lookback=req.lookback, epochs=req.epochs)
+            metrics = engine.run_lstm(lookback=req.lookback, epochs=req.epochs, use_cached=req.use_cached)
         else:
             raise HTTPException(400, f"Unknown model: {model}")
     except Exception as e:
@@ -171,6 +172,55 @@ def run_forecast(req: ForecastRequest):
         "metrics": _clean_metrics(metrics),
         "forecast": forecast_df.to_dict(orient="records"),
         "summary": summary,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
+# LSTM pre-train endpoints (for demo mode)
+# ══════════════════════════════════════════════════════════════════════
+
+import threading
+_pretrain_state = {"running": False, "done": False, "error": None}
+
+class PretrainRequest(BaseModel):
+    lookback: int = 48
+    epochs: int = 50
+
+@app.post("/api/lstm/pretrain")
+def pretrain_lstm(req: PretrainRequest, background_tasks: BackgroundTasks):
+    """
+    Kick off LSTM training in the background and save to saved_models/lstm_demo.keras.
+    Poll /api/lstm/status to check progress.
+    """
+    _require_data()
+    if _pretrain_state["running"]:
+        return {"status": "already_running"}
+
+    def _train():
+        _pretrain_state["running"] = True
+        _pretrain_state["done"] = False
+        _pretrain_state["error"] = None
+        try:
+            engine: ForecastEngine = _state["engine"]
+            engine.run_lstm(lookback=req.lookback, epochs=req.epochs, use_cached=False)
+            _pretrain_state["done"] = True
+        except Exception as e:
+            _pretrain_state["error"] = str(e)
+        finally:
+            _pretrain_state["running"] = False
+
+    background_tasks.add_task(_train)
+    return {"status": "started"}
+
+@app.get("/api/lstm/status")
+def lstm_status():
+    from forecasting.forecast_engine import MODEL_DIR
+    model_path = os.path.join(MODEL_DIR, "lstm_demo.keras")
+    return {
+        "running": _pretrain_state["running"],
+        "done": _pretrain_state["done"],
+        "error": _pretrain_state["error"],
+        "model_saved": os.path.exists(model_path),
     }
 
 
